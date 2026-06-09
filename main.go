@@ -61,6 +61,7 @@ func main() {
 	bot.Session.AddHandler(readyHandler(bot, openaisv, cid))
 	bot.Session.AddHandler(messageCreateHandler(bot, cid, openaisv))
 	bot.Session.AddHandler(forgetCommandHandler(bot))
+	bot.Session.AddHandler(forgetConfirmHandler(bot))
 	bot.Session.Open()
 
 	sigch := make(chan os.Signal, 1)
