@@ -84,6 +84,8 @@ func messageCreateHandler(b *DiscordBot, cid string, oai *OpenAiService) func(s 
 			}
 			usermassage := m.Author.GlobalName + ": " + m.Content
 
+			// メッセージ追加前の配列の長さを記録（エラー時のロールバック用）
+			messagesLenBefore := len(b.CompletionParams.Messages.Value)
 			b.CompletionParams.Messages.Value = append(b.CompletionParams.Messages.Value, openai.UserMessage(usermassage))
 			// 入力中... 表示を開始するゴルーチン
 			go func() {
@@ -152,6 +154,9 @@ func messageCreateHandler(b *DiscordBot, cid string, oai *OpenAiService) func(s 
 					msg := fmt.Sprintf(":warning: エラー: メッセージの応答処理中にエラーが発生しました。\ndetail:\n```\n%s```", err)
 					s.ChannelMessageSend(m.ChannelID, msg)
 				}
+
+				// ロールバック: 追加したユーザーメッセージを削除
+				b.CompletionParams.Messages.Value = b.CompletionParams.Messages.Value[:messagesLenBefore]
 
 				return
 			}
