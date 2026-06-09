@@ -64,6 +64,15 @@ func readyHandler(b *DiscordBot, oai *OpenAiService, cid string) func(s *discord
 		}
 
 		s.ChannelMessageSend(cid, "Botがログインしました。")
+
+		// スラッシュコマンドの登録
+		_, err := s.ApplicationCommandCreate(s.State.User.ID, "", &discordgo.ApplicationCommand{
+			Name:        "forget",
+			Description: "このチャンネルにおけるBotの記憶を削除します。",
+		})
+		if err != nil {
+			log.Printf("Error: Error happend registering slash command: %v", err)
+		}
 	}
 }
 
