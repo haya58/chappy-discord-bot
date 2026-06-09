@@ -93,8 +93,8 @@ func messageCreateHandler(b *DiscordBot, cid string, oai *OpenAiService) func(s 
 			}
 			usermassage := m.Author.GlobalName + ": " + m.Content
 
-			// メッセージ履歴に追加
-			b.History.AddMessage(cid, "user", usermassage)
+			// メッセージ追加前の配列の長さを記録（エラー時のロールバック用）
+			messagesLenBefore := len(b.CompletionParams.Messages.Value)
 			b.CompletionParams.Messages.Value = append(b.CompletionParams.Messages.Value, openai.UserMessage(usermassage))
 			// 入力中... 表示を開始するゴルーチン
 			go func() {
@@ -117,13 +117,14 @@ func messageCreateHandler(b *DiscordBot, cid string, oai *OpenAiService) func(s 
 			}()
 			// OpenAI APIへ投げ、返ってきた応答を送信する
 			completion, err := oai.Client.Chat.Completions.New(context.TODO(), b.CompletionParams)
-
+			isErr := false
 			if err != nil {
 				var apierr *openai.Error
 				// API Error であればステータスコードに応じたエラーを出す
 				if errors.As(err, &apierr) {
 					log.Println("Warning: API error, %w", err)
 					status := apierr.StatusCode
+					isErr = true
 					switch status {
 					case 400:
 						s.ChannelMessageSend(m.ChannelID, ":warning: エラー: リクエスト内容が不正です。メッセージ内容を確認してください。")
@@ -163,10 +164,17 @@ func messageCreateHandler(b *DiscordBot, cid string, oai *OpenAiService) func(s 
 					s.ChannelMessageSend(m.ChannelID, msg)
 				}
 
+				// ロールバック: 追加したユーザーメッセージを削除
+				b.CompletionParams.Messages.Value = b.CompletionParams.Messages.Value[:messagesLenBefore]
+
 				return
 			}
-			// メッセージ履歴に追加
-			b.History.AddMessage(cid, "assistant", completion.Choices[0].Message.Content)
+			if isErr == false {
+				// メッセージ履歴に追加
+				b.History.AddMessage(cid, "user", usermassage)
+				// メッセージ履歴に追加
+				b.History.AddMessage(cid, "assistant", completion.Choices[0].Message.Content)
+			}
 
 			// Discord の1メッセージあたりの文字数制限に抵触しないよう、1500文字を1チャンクとして分割して送信する
 			n := 1500
