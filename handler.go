@@ -170,6 +170,13 @@ func messageCreateHandler(b *DiscordBot, cid string, oai *OpenAiService) func(s 
 				return
 			}
 			if isErr == false {
+				// APIからの応答が空の場合、履歴に保存せずロールバック
+				if completion.Choices[0].Message.Content == "" {
+					log.Println("Warning: API response is empty, rolling back user message")
+					b.CompletionParams.Messages.Value = b.CompletionParams.Messages.Value[:messagesLenBefore]
+					return
+				}
+
 				// メッセージ履歴に追加
 				b.History.AddMessage(cid, "user", usermassage)
 				// メッセージ履歴に追加
