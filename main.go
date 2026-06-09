@@ -5,8 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-
-	"github.com/bwmarrin/discordgo"
 )
 
 func main() {
@@ -64,14 +62,6 @@ func main() {
 	bot.Session.AddHandler(messageCreateHandler(bot, cid, openaisv))
 	bot.Session.AddHandler(forgetCommandHandler(bot))
 	bot.Session.Open()
-	// スラッシュコマンドの登録
-	_, err = bot.Session.ApplicationCommandCreate(bot.Session.State.User.ID, "", &discordgo.ApplicationCommand{
-		Name:        "forget",
-		Description: "このチャンネルにおけるBotの記憶を削除します。",
-	})
-	if err != nil {
-		log.Printf("Error: Error happend registering slash command: %v", err)
-	}
 
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
