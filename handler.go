@@ -204,7 +204,49 @@ func messageCreateHandler(b *DiscordBot, cid string, oai *OpenAiService) func(s 
 
 func forgetCommandHandler(b *DiscordBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if i.Type != discordgo.InteractionApplicationCommand {
+			return
+		}
 		if i.ApplicationCommandData().Name == "forget" {
+			// 確認ボタンを表示
+			err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "チャットボットの記憶を消去しますか？",
+					Components: []discordgo.MessageComponent{
+						discordgo.ActionsRow{
+							Components: []discordgo.MessageComponent{
+								discordgo.Button{
+									Label:    "はい、消去します",
+									Style:    discordgo.DangerButton,
+									CustomID: "forget_confirm_yes",
+								},
+								discordgo.Button{
+									Label:    "いいえ、キャンセル",
+									Style:    discordgo.SecondaryButton,
+									CustomID: "forget_confirm_no",
+								},
+							},
+						},
+					},
+				},
+			})
+			if err != nil {
+				log.Printf("Error: Failed to respond to forget command: %v", err)
+			}
+		}
+	}
+}
+
+func forgetConfirmHandler(b *DiscordBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if i.Type != discordgo.InteractionMessageComponent {
+			return
+		}
+
+		customID := i.MessageComponentData().CustomID
+
+		if customID == "forget_confirm_yes" {
 			// 保持している会話履歴のリセット
 			err := b.History.Forget(i.ChannelID)
 			b.CompletionParams.Messages.Value = []openai.ChatCompletionMessageParamUnion{}
@@ -213,20 +255,40 @@ func forgetCommandHandler(b *DiscordBot) func(s *discordgo.Session, i *discordgo
 			log.Println("Info: Removing bot history...")
 			if err != nil {
 				msg := fmt.Sprintf(":warning: エラー: 記憶消去処理中にエラーが発生しました。\ndetail:\n```\n%s```", err)
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
+				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
 					Data: &discordgo.InteractionResponseData{
-						Content: msg,
+						Content:    msg,
+						Components: []discordgo.MessageComponent{},
 					},
 				})
+				if err != nil {
+					log.Printf("Error: Failed to respond with forget error: %v", err)
+				}
 			} else {
-				log.Println("Info: Removing bot history...")
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
+				log.Println("Info: Bot history removed.")
+				err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseUpdateMessage,
 					Data: &discordgo.InteractionResponseData{
-						Content: "✅チャットボットの記憶を消去しました。",
+						Content:    "✅チャットボットの記憶を消去しました。",
+						Components: []discordgo.MessageComponent{},
 					},
 				})
+				if err != nil {
+					log.Printf("Error: Failed to respond to forget confirm: %v", err)
+				}
+			}
+		} else if customID == "forget_confirm_no" {
+			// キャンセル
+			err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseUpdateMessage,
+				Data: &discordgo.InteractionResponseData{
+					Content:    "チャットボットの記憶消去をキャンセルしました。",
+					Components: []discordgo.MessageComponent{},
+				},
+			})
+			if err != nil {
+				log.Printf("Error: Failed to respond to forget cancel: %v", err)
 			}
 		}
 	}
